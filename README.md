@@ -122,7 +122,7 @@ The key's randomart image is:
 ![alt text](img/user.png)    
 
 
-### 4. Настройка файерволла    
+### 4. Настройка firewall    
 
 Для работы LDAP необходимо открыть следующие порты    
 
@@ -132,7 +132,7 @@ The key's randomart image is:
 |80, 443|tcp|HTTP/HTTPS|
 |389, 636|tcp|LDAP/LDPAS|
 |88, 464|tcp/udp|Kerberos|
-|123|tcp/udp|NTP|     
+|123|udp|NTP|     
 
 Playbook ansible в моем скрипте уже включает задачу включения firewalld и открытия нужных портов, просто убедился что все так и есть    
 
