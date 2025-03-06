@@ -1,0 +1,36 @@
+[sssd]
+domains = otus.lan
+config_file_version = 2
+services = nss, pam, sudo
+
+[domain/otus.lan]
+id_provider = ipa
+auth_provider = ipa
+access_provider = ipa
+chpass_provider = ipa
+ipa_domain = otus.lan
+ipa_server = _srv_, ipa.otus.lan
+ldap_tls_cacert = /etc/ipa/ca.crt
+cache_credentials = True
+krb5_store_password_if_offline = True
+ipa_server_mode = True
+
+[nss]
+filter_groups = root
+filter_users = root
+reconnection_retries = 3
+
+[pam]
+offline_credentials_expiration = 2
+offline_failed_login_attempts = 3
+offline_failed_login_delay = 5
+
+[sudo]
+
+[autofs]
+
+[ssh]
+
+[pac]
+
+[ifp]
