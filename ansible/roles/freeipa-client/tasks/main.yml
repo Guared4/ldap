@@ -1,0 +1,64 @@
+- name: Install required packages
+  yum:
+    name:
+      - freeipa-client
+      - chrony
+      - firewalld
+    state: present
+
+- name: Install required Python libraries for SELinux
+  yum:
+    name:
+      - python3-libsemanage
+    state: present
+  when: ansible_os_family == "RedHat"
+
+- name: Configure SELinux for home directories
+  seboolean:
+    name: use_nfs_home_dirs
+    state: yes
+    persistent: yes
+  when: ansible_os_family == "RedHat"
+
+- name: Configure chrony
+  template:
+    src: chrony.conf.j2
+    dest: /etc/chrony.conf
+  notify: restart chronyd
+
+- name: Start chronyd
+  service:
+    name: chronyd
+    state: started
+    enabled: yes
+
+- name: Configure hosts file
+  template:
+    src: hosts.j2
+    dest: /etc/hosts
+
+- name: Set hostname
+  hostname:
+    name: "{{ inventory_hostname }}"
+
+- name: Enable firewalld
+  service:
+    name: firewalld
+    state: started
+    enabled: yes
+
+- name: Open SSH port
+  firewalld:
+    port: 22/tcp
+    permanent: yes
+    immediate: yes
+    state: enabled
+
+- name: Join IPA domain
+  command: |
+    ipa-client-install --unattended \
+      --mkhomedir \
+      --domain=otus.lan \
+      --server=ipa.otus.lan \
+      --principal=admin \
+      --password=Qazwsx123
