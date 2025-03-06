@@ -1,6 +1,0 @@
-- name: Reboot all servers and wait for them to come back online
-  ansible.builtin.reboot:
-    reboot_timeout: 600
-    connect_timeout: 60
-    pre_reboot_delay: 0
-    post_reboot_delay: 30
