@@ -1,0 +1,133 @@
+- name: Install required packages
+  yum:
+    name:
+      - freeipa-server
+      - chrony
+      - firewalld
+    state: present
+
+- name: Configure system settings
+  block:
+    - name: Configure SELinux
+      selinux:
+        state: disabled
+
+    - name: Update kernel parameters
+      sysctl:
+        name: "{{ item.key }}"
+        value: "{{ item.value }}"
+        sysctl_set: yes
+        state: present
+        reload: yes
+      loop:
+        - { key: 'net.ipv4.ip_forward', value: '1' }
+        - { key: 'net.ipv6.conf.all.forwarding', value: '1' }
+
+    - name: Configure hosts file
+      template:
+        src: hosts.j2
+        dest: /etc/hosts
+
+    - name: Set hostname
+      hostname:
+        name: ipa.otus.lan
+
+- name: Configure time synchronization
+  block:
+    - name: Configure chrony
+      template:
+        src: chrony.conf.j2
+        dest: /etc/chrony.conf
+      notify: restart chronyd
+
+    - name: Start chronyd
+      service:
+        name: chronyd
+        state: started
+        enabled: yes
+
+- name: Configure firewalld
+  block:
+    - name: Enable firewalld
+      service:
+        name: firewalld
+        state: started
+        enabled: yes
+
+    - name: Open FreeIPA ports
+      firewalld:
+        service: freeipa-ldap
+        permanent: yes
+        immediate: yes
+        state: enabled
+
+    - name: Open additional FreeIPA ports
+      firewalld:
+        port: "{{ item }}"
+        permanent: yes
+        immediate: yes
+        state: enabled
+      loop:
+        - 80/tcp
+        - 443/tcp
+        - 389/tcp
+        - 636/tcp
+        - 88/tcp
+        - 88/udp
+        - 464/tcp
+        - 464/udp
+        - 53/tcp
+        - 53/udp
+        - 123/udp
+      notify: reload firewalld
+
+- name: Ensure correct entry in /etc/hosts
+  lineinfile:
+    path: /etc/hosts
+    regexp: '^192\.168\.57\.10'
+    line: "192.168.57.10 ipa.otus.lan ipa"
+    state: present
+
+- name: Set hostname
+  hostname:
+    name: ipa.otus.lan
+
+- name: Check if FreeIPA is already installed
+  stat:
+    path: /etc/ipa/default.conf
+  register: ipa_installed
+
+- name: Install FreeIPA server
+  command: |
+    ipa-server-install --unattended \
+      --hostname=ipa.otus.lan \
+      --domain=otus.lan \
+      --realm=OTUS.LAN \
+      --ds-password=Qwerty123 \
+      --admin-password=Qazwsx123
+  when: not ipa_installed.stat.exists
+  register: ipa_install_result
+  ignore_errors: yes
+
+- name: Check if user exists
+  shell: echo "{{ admin_password }}" | kinit {{ admin_account }}; ipa user-find --login={{ user_account }}
+  failed_when: false
+  changed_when: false
+  register: result
+  when: '"ipa" in group_names'
+
+- name: Fail if FreeIPA installation failed
+  fail:
+    msg: "FreeIPA installation failed. Check logs for details."
+  when: ipa_install_result is failed
+
+- name: Check if user exists
+  shell: echo "{{ admin_password }}" | kinit {{ admin_account }}; ipa user-find --login={{ user_account }}
+  failed_when: false
+  changed_when: false
+  register: result
+  when: admin_password is defined and '"ipa" in group_names'
+
+- name: Create user Otus
+  shell: echo "{{ user_password }}" | ipa user-add "{{ user_account }}" --first="{{ user_first }}" --last="{{ user_last }}" --shell="{{ user_shell }}" --sshpubkey="{{ pub_key }}" --password
+  when: '"ipa" in group_names and "0 users matched" in result.stdout'
